@@ -106,3 +106,14 @@ testCases:
         responseTrailers:
         - name: x-custom-trailer
           value: ["bing","quux"]
+- request:
+    testName: server stream error no responses
+    service: connectrpc.conformance.v1.ConformanceService
+    method: ServerStream
+    streamType: STREAM_TYPE_SERVER_STREAM
+    requestMessages:
+    - "@type": type.googleapis.com/connectrpc.conformance.v1.ServerStreamRequest
+      responseDefinition:
+        error:
+          code: 13
+          message: "server stream failed"

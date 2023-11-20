@@ -132,18 +132,20 @@ func (s *conformanceServer) ServerStream(
 		return err
 	}
 	respNum := 0
+	resp := &v1.ServerStreamResponse{
+		Payload: &v1.ConformancePayload{
+			RequestInfo: createRequestInfo(ctx, req.Header(), []*anypb.Any{msgAsAny}),
+		},
+	}
+
 	for _, data := range responseDefinition.ResponseData {
-		resp := &v1.ServerStreamResponse{
-			Payload: &v1.ConformancePayload{
-				Data: data,
-			},
-		}
+		resp.Payload.Data = data
 
 		// Only set the request info if this is the first response being sent back
 		// because for server streams, nothing in the request info will change
 		// after the first response.
-		if respNum == 0 {
-			resp.Payload.RequestInfo = createRequestInfo(ctx, req.Header(), []*anypb.Any{msgAsAny})
+		if respNum > 0 {
+			resp.Payload.RequestInfo = nil
 		}
 
 		time.Sleep((time.Duration(responseDefinition.ResponseDelayMs) * time.Millisecond))
@@ -155,6 +157,18 @@ func (s *conformanceServer) ServerStream(
 	}
 
 	if responseDefinition.Error != nil {
+		if respNum == 0 {
+			// TODO - We've sent no responses are are returning an error, so set the
+			// known conformance payload as the details
+			payload := &v1.ConformancePayload{
+				RequestInfo: createRequestInfo(ctx, req.Header(), []*anypb.Any{msgAsAny}),
+			}
+			payloadAny, err := anypb.New(payload)
+			if err != nil {
+				return connect.NewError(connect.CodeInternal, err)
+			}
+			responseDefinition.Error.Details = []*anypb.Any{payloadAny}
+		}
 		return internal.ConvertProtoToConnectError(responseDefinition.Error)
 	}
 	return nil
@@ -264,6 +278,11 @@ func (s *conformanceServer) BidiStream(
 	}
 
 	if responseDefinition.Error != nil {
+		if respNum == 0 {
+
+		}
+		// TODO - If we haven't sent any responses up to this point, this error
+		// should contain a basic conformance payload as the details
 		return internal.ConvertProtoToConnectError(responseDefinition.Error)
 	}
 	return nil

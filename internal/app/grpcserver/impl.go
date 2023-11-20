@@ -174,6 +174,19 @@ func (c *conformanceServiceServer) ServerStream(
 		respNum++
 	}
 	if responseDefinition.Error != nil {
+		if respNum == 0 {
+			metadata, _ := metadata.FromIncomingContext(stream.Context())
+			// We've sent no responses and are returning an error, so set the
+			// known conformance payload as the details
+			payload := &v1.ConformancePayload{
+				RequestInfo: createRequestInfo(metadata, []*anypb.Any{msgAsAny}),
+			}
+			payloadAny, err := anypb.New(payload)
+			if err != nil {
+				return status.Error(codes.Internal, err.Error())
+			}
+			responseDefinition.Error.Details = []*anypb.Any{payloadAny}
+		}
 		return grpcutil.ConvertProtoToGrpcError(responseDefinition.Error)
 	}
 	return nil
